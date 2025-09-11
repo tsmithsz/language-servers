@@ -28,6 +28,14 @@ const LIBRARY_DIR = (() => {
     return path.join(__dirname, 'indexing')
 })()
 
+// Helper function to normalize Windows UNC paths
+function normalizeWindowsPath(filePath: string): string {
+    if (process.platform === 'win32' && filePath.startsWith('\\\\?\\')) {
+        return filePath.substring(4)
+    }
+    return filePath
+}
+
 export interface SizeConstraints {
     maxFileSize: number
     remainingIndexSize: number
@@ -136,6 +144,7 @@ export class LocalProjectContextController {
                 `Vector library initializing with GPU acceleration: ${enableGpuAcceleration}, ` +
                     `index worker thread count: ${indexWorkerThreads}`
             )
+            this.log.info(`testing normalization: tsmithsz`)
 
             // build index if vecLib was initialized but indexing was not enabled before
             if (this._vecLib) {
@@ -159,7 +168,10 @@ export class LocalProjectContextController {
             const libraryPath = this.getVectorLibraryPath()
             const vecLib = vectorLib ?? (await eval(`import("${libraryPath}")`))
             if (vecLib) {
-                this._vecLib = await vecLib.start(LIBRARY_DIR, this.clientName, this.indexCacheDirPath)
+                const originalPath = LIBRARY_DIR
+                const normalizedPath = normalizeWindowsPath(LIBRARY_DIR)
+                this.log.info(`Vector library paths - Original: ${originalPath}, Normalized: ${normalizedPath}`)
+                this._vecLib = await vecLib.start(normalizedPath, this.clientName, this.indexCacheDirPath)
                 if (enableIndexing) {
                     this.buildIndex('all').catch(e => {
                         this.log.error(`Error building index on init with indexing enabled: ${e}`)

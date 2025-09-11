@@ -9,6 +9,14 @@ import { TestFeatures } from '@aws/language-server-runtimes/testing'
 import sinon from 'ts-sinon'
 import { ContextCommandItem } from 'local-indexing'
 
+// Helper function to normalize Windows UNC paths (copied from implementation for testing)
+function normalizeWindowsPath(filePath: string): string {
+    if (process.platform === 'win32' && filePath.startsWith('\\\\?\\')) {
+        return filePath.substring(4)
+    }
+    return filePath
+}
+
 class LoggingMock {
     public error: SinonStub
     public info: SinonStub
@@ -231,6 +239,24 @@ describe('LocalProjectContextController', () => {
             })
             assert.deepStrictEqual(result, [])
             sinonAssert.called(logging.error)
+        })
+    })
+
+    describe('normalizeWindowsPath', () => {
+        it('should strip UNC prefix from faiss-node path', () => {
+            const originalPlatform = process.platform
+            Object.defineProperty(process, 'platform', { value: 'win32' })
+
+            // Test with what user actually sees: \\?\C:
+            const uncPath =
+                '\\\\?\\C:\\Users\\username\\AppData\\Local\\aws\\toolkits\\language-servers\\AmazonQ\\1.31.0\\servers\\indexing\\dist\\build\\Release\\faiss-node.node'
+            const expected =
+                'C:\\Users\\username\\AppData\\Local\\aws\\toolkits\\language-servers\\AmazonQ\\1.31.0\\servers\\indexing\\dist\\build\\Release\\faiss-node.node'
+            const result = normalizeWindowsPath(uncPath)
+
+            assert.strictEqual(result, expected)
+
+            Object.defineProperty(process, 'platform', { value: originalPlatform })
         })
     })
 
